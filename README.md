@@ -14,6 +14,7 @@ Mes_project/
 ├── dump/                # 데이터베이스 초기화 및 학습 데이터
 ├── docker-compose.yml   # AI 서비스 및 앱 컨테이너 오케스트레이션
 └── .gitignore           # Git 설정 파일
+```
 🧠 핵심 AI 기능 (AI & Analytics)
 이 시스템은 목적에 따라 Server-side와 Client-side(Web) 두 가지 환경에서 AI 모델을 구동합니다.
 
