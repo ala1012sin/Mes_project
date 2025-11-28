@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}작업지시 목록{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-3">품질검사</h2>
+
+  <!-- 신규 품질검사 등록 폼 -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">신규 품질검사</h5>
+      <form method="post" action="/inspections/orders" class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">작업지시</label>
+          <select name="order_id" id="order-select" class="form-select" required>
+            <option value="">선택...</option>
+            {% for o in orders %}
+              <option value="{{ o.order_id }}" data-product-id="{{ o.product_id }}">{{ o.order_id }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">제품</label>
+          <select name="product_id" id="product-select" class="form-select" required>
+            <option value="">선택...</option>
+            {% for p in products %}
+              <option value="{{ p.product_id }}">{{ p.name }} ({{ p.product_id }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">검사수량</label>
+          <input type="number" name="inspection_qty" class="form-control" min="1" value="10" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">검사자</label>
+          <input type="text" name="inspector" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">검사예정일</label>
+          <input type="datetime-local" name="inspection_date" class="form-control" required>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">비고</label>
+          <input type="text" name="notes" class="form-control" required>
+        </div>
+        <input type="hidden" name="status" value="검사대기">
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-primary">등록</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 목록 -->
+  <div class="card">
+    <div class="card-body">
+      <table class="table table-striped align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>검사 ID</th>
+            <th>작업지시</th>
+            <th>제품</th>
+            <th>검사수량</th>
+            <th>검사자</th>
+            <th>검사예정일</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr>
+            <td><a href="/inspections/orders/{{ it.inspection_id }}">{{ it.inspection_id }}</a></td>
+            <td>{{ it.order_id }}</td>
+            <td>
+              <div>{{ it.product_id }}</div>
+              <small class="text-muted">{{ it.product_name }}</small>
+            </td>
+            <td>{{ it.inspection_qty }}</td>
+            <td>{{ it.inspector }}</td>
+            <td>{{ it.inspection_date.strftime('%Y-%m-%d %H:%M') if it.inspection_date else '' }}</td>
+            <td>{{ it.status }}</td>
+          </tr>
+          {% endfor %}
+          {% if items|length == 0 %}
+          <tr><td colspan="7" class="text-center text-muted">데이터가 없습니다.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+
+      <div class="text-muted small">총 {{ total }}건</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    
+    const orderSelect = document.getElementById("order-select");
+    const productSelect = document.getElementById("product-select");
+
+    orderSelect.addEventListener("change", function(event) {
+      
+      const selectedOption = event.currentTarget.selectedOptions[0];
+      
+      const productIdToSelect = selectedOption.dataset.productId;
+
+      if (productIdToSelect) {
+        productSelect.value = productIdToSelect;
+      } else {
+        productSelect.value = "";
+      }
+    });
+  });
+</script>
+{% endblock %}

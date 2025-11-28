@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}기계부품 분류{% endblock %}
+
+{% block content %}
+<style>
+    /* 모달이 닫혀있을 때 pointer-events 무시 */
+    #detailModal.modal.show ~ * {
+        pointer-events: none;
+    }
+    #detailModal.modal:not(.show) {
+        pointer-events: none;
+    }
+</style>
+<div class="container my-5">
+    <h3 class="mb-4 fw-bold">기계부품 분류</h3>
+    <div class="mb-4">
+        <input type="file" id="file-input" webkitdirectory directory multiple accept="image/*"/>
+        <button id="upload-button" class="btn btn-primary" disabled>
+            폴더 업로드
+        </button>
+        <p id="upload-status" class="text-muted mt-2 small">
+            이미지 폴더를 선택해주세요.
+        </p>
+    </div>
+
+    <div id="image-grid" class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-3"></div>
+    <div id="empty-message" class="text-center text-muted py-5 d-none">
+        검사를 시작하려면 폴더를 업로드하세요.
+    </div>
+</div>
+
+<!-- 모달: 상세 정보 팝업 -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailModalLabel">이미지 분석 결과</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 text-center">
+                        <img id="modalImage" src="" alt="분석 이미지" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>파일명:</strong> <span id="modalFileName"></span></p>
+                        <p><strong>분류 결과:</strong> <span id="modalPredictedClass" class="badge bg-primary"></span></p>
+                        <p><strong>신뢰도:</strong> <span id="modalConfidence" class="badge bg-success"></span></p>
+                        <hr>
+                        <div id="modalClassInfo"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    
+    // DOM 요소
+    const uploadButton = document.getElementById('upload-button');
+    const fileInput = document.getElementById('file-input');
+    const uploadStatus = document.getElementById('upload-status');
+    const imageGrid = document.getElementById('image-grid');
+    const emptyMessage = document.getElementById('empty-message');
+
+    let model = null;
+    let isLoading = false;
+    const CLASS_LABELS = ['pliers', 'puller', 'screwdriver', 'wrench'];
+    const MODEL_URL = '/static/tools_cnn_model/model.json';
+    let allPredictions = []; // 예측 결과 저장 (모달에서 사용)
+
+    // 모델 로드
+    const loadModel = async () => {
+        try {
+            model = await tf.loadGraphModel(MODEL_URL);
+        } catch (error) {
+            console.error('모델 로드 실패:', error);
+            alert('모델 로드 실패.');
+        }
+    };
+    
+    // 이미지 전처리 및 예측
+    const predictImage = (imageFile) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const img = new Image();
+                img.onload = async () => {
+                    let tensor = null;
+                    let prediction = null;
+                    let predictedClass = '에러';
+                    let confidence = 0;
+                    try {
+                        tensor = tf.browser.fromPixels(img)
+                            .resizeNearestNeighbor([224, 224])
+                            .toFloat()
+                            .div(255.0)
+                            .expandDims(0);
+
+                        prediction = model.predict(tensor);
+                        const probabilities = await prediction.data();
+                        const predictedClassIndex = probabilities.indexOf(Math.max(...probabilities));
+                        predictedClass = CLASS_LABELS[predictedClassIndex];
+                        confidence = (Math.max(...probabilities) * 100).toFixed(2);
+
+                    } catch (error) {
+                        console.error('예측 실패:', error);
+                    } finally {
+                        if (tensor) tensor.dispose();
+                        if (prediction) prediction.dispose();
+                        resolve({
+                            file: imageFile,
+                            preview: e.target.result,
+                            predictedClass: predictedClass,
+                            confidence: confidence
+                        });
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(imageFile);
+        });
+    };
+
+    // 결과 카드 HTML 생성
+    const createResultCard = (img, index) => {      
+        return `
+            <div class="col">
+                <div class="card shadow-sm h-100 cursor-pointer" style="cursor: pointer;" onclick="openModal(${index})">
+                    <img src="${img.preview}" class="card-img-top p-2" alt="${img.file.name}" style="height: 150px; object-fit: contain;">
+                    <div class="card-body text-center">
+                        <p class="card-text text-muted small mb-1 text-truncate" title="${img.file.name}">
+                            ${img.file.name}
+                        </p>
+                        <h6 class="card-title fw-bold mb-0">
+                            ${img.predictedClass}
+                        </h6>
+                        <small class="text-success">신뢰도: ${img.confidence}%</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
+    // 이벤트 핸들러: 폴더 업로드
+    const handleFolderUpload = async (e) => {
+        const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
+
+        if (files.length === 0 || isLoading || !model) return;
+
+        isLoading = true;
+        imageGrid.innerHTML = '';
+        emptyMessage.classList.add('d-none');
+        uploadButton.disabled = true;
+        uploadButton.textContent = '처리 중...';
+        uploadStatus.textContent = `${files.length}개 파일 처리 중...`;
+
+        try {
+            allPredictions = await Promise.all(files.map(file => predictImage(file)));
+            const resultsHtml = allPredictions.map((img, index) => createResultCard(img, index)).join('');
+            imageGrid.innerHTML = resultsHtml;
+        } catch (error) {
+            console.error('처리 오류:', error);
+        } finally {
+            isLoading = false;
+            uploadButton.disabled = false;
+            uploadButton.textContent = '폴더 업로드';
+            uploadStatus.textContent = `${files.length}개 파일 처리 완료.`;
+            fileInput.value = null; 
+        }
+    };
+
+    // 모달 열기
+    const openModal = (index) => {
+        if (index >= 0 && index < allPredictions.length) {
+            const img = allPredictions[index];
+            document.getElementById('modalImage').src = img.preview;
+            document.getElementById('modalFileName').textContent = img.file.name;
+            document.getElementById('modalPredictedClass').textContent = img.predictedClass;
+            document.getElementById('modalConfidence').textContent = `${img.confidence}%`;
+            
+            // 클래스별 설명 및 사용법
+            const classDetails = {
+                'pliers': {
+                    description: '물체를 잡거나, 구부리거나, 절단하는 등 다양한 작업에 사용되는 다목적 공구',
+                    usage: ['물체 잡기 및 고정', '구부리기 및 펴기', '절단']
+                },
+                'puller': {
+                    description: '축에 단단히 박혀있는 기어, 베어링, 풀리 등을 분리할 때 사용되는 특수 공구',
+                    usage: ['올바른 크기의 풀러 선택', '턱(Jaw) 걸기', '중앙 축 정렬', '조이기 및 분리']
+                },
+                'screwdriver': {
+                    description: '나사를 조이거나 푸는 데 사용되는 가장 일반적이고 필수적인 공구',
+                    usage: ['나사 홈에 맞추기', '수직으로 삽입', '힘을 가하며 돌리기', '방향 확인 (조임/풀림)']
+                },
+                'wrench': {
+                    description: '볼트나 너트를 조이거나 푸는 데 사용되는 기본적인 공구',
+                    usage: ['올바른 크기 선택', '방향 확인 (조임/풀림)', '확실한 체결', '힘 가하기']
+                }
+            };
+            
+            const details = classDetails[img.predictedClass];
+            if (details) {
+                const usageHtml = details.usage.map(step => `<li class="mb-2">${step}</li>`).join('');
+                document.getElementById('modalClassInfo').innerHTML = `
+                    <div>
+                        <h6 class="fw-bold mb-2">설명</h6>
+                        <p class="text-muted small mb-3">${details.description}</p>
+                        <h6 class="fw-bold mb-2">사용법</h6>
+                        <ol class="small ps-3">
+                            ${usageHtml}
+                        </ol>
+                    </div>
+                `;
+            } else {
+                document.getElementById('modalClassInfo').innerHTML = '<p class="text-muted small">분류 정보를 찾을 수 없습니다.</p>';
+            }
+            
+            const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+            modal.show();
+        }
+    };
+
+    // 초기화
+    document.addEventListener('DOMContentLoaded', () => {
+        uploadButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFolderUpload);
+        loadModel();
+        
+        // 모달 이벤트: 닫혔을 때 pointer-events 복구
+        const detailModal = document.getElementById('detailModal');
+        detailModal.addEventListener('hidden.bs.modal', () => {
+            detailModal.style.pointerEvents = 'none';
+        });
+        detailModal.addEventListener('show.bs.modal', () => {
+            detailModal.style.pointerEvents = 'auto';
+        });
+    });
+</script>
+{% endblock %}
