@@ -12,3 +12,12 @@ def show_classification(request: Request):
         "image_classification_simple.html",
         {"request": request}
     )
+    
+    
+# GET localhost:8080/image/detection
+@router.get("/detection", response_class=HTMLResponse)
+def show_detection(request: Request):
+    return templates.TemplateResponse(
+        "image_detection.html",
+        {"request": request}
+    )

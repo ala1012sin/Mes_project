@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}실시간 칩 탐지{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <h3 class="mb-4 fw-bold">실시간 부품 탐지</h3>
+    <canvas id="canvas" width="640" height="480"></canvas> 
+    <video id="video" autoplay playsinline muted width="640" height="480" style="display: none;"></video>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script>
+        const CLASS_LABELS = ['DIP-14', 'QFN', 'SOP-16', 'SOP-8', 'SOT-223', 'TO-252', 'TSSOP-8'];
+        const THRESHOLD = 0.6;
+        const INPUT_SIZE = 640;
+        
+        let model;
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 초기화 및 자동 시작
+        (async () => {
+            // 모델 로드
+            model = await tf.loadGraphModel('/static/chip_detection_model/model.json');
+            
+            // 웹캠 시작
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                video.play();
+                detect();
+            };
+        })();
+
+        // 탐지 루프
+        const detect = async () => {
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+                requestAnimationFrame(detect); //프레임을 반복해서 보여주는 함수
+                return;
+            }
+
+            const [output] = tf.tidy(() => { //메모리 누수를 방지하기 위해 tf.tidy 사용
+                const tensor = tf.browser.fromPixels(video)
+                    .resizeBilinear([INPUT_SIZE, INPUT_SIZE])// tensor를 만들때 항상 복사 후 resize 복사후 div 복사후 expand를 해서 
+                    .div(255.0)                              // 그전의 tensor를 지우지 않음 그래서 tidy를 사용해서 삭제함
+                    .expandDims(0);
+                return [model.execute(tensor).arraySync()[0]]; //단일 예측 결과 반환
+            });
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const numDetections = output[0].length;
+            for (let i = 0; i < numDetections; i++) {
+                let maxConf = 0, maxClassId = 0;
+                
+                //OUTPUT: cx, cy, w, h, class0_prob, class1_prob, ...
+                for (let j = 0; j < CLASS_LABELS.length; j++) { // 첫 번째 박스가 클래스 0일 확률, 1일 확률 ... -> 두 번째 박스가 클래스 0일 확률, 1일 확률 ...
+                    if (output[4 + j][i] > maxConf) { 
+                        maxConf = output[4 + j][i];
+                        maxClassId = j;
+                    }
+                }
+
+                if (maxConf > THRESHOLD) {
+                    const cx = output[0][i], cy = output[1][i], w = output[2][i], h = output[3][i];
+                    const x = (cx - w / 2) * canvas.width / INPUT_SIZE;
+                    const y = (cy - h / 2) * canvas.height / INPUT_SIZE;
+                    const width = w * canvas.width / INPUT_SIZE;
+                    const height = h * canvas.height / INPUT_SIZE;
+
+                    ctx.strokeStyle = '#00FF7F';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+
+                    const label = `${CLASS_LABELS[maxClassId]} (${maxConf.toFixed(2)})`;
+                    ctx.fillStyle = '#00FF7F';
+                    ctx.fillRect(x, y - 20, ctx.measureText(label).width + 10, 20);
+                    ctx.fillStyle = '#000';
+                    ctx.font = '14px Arial';
+                    ctx.fillText(label, x + 5, y - 5);
+                }
+            }
+
+            tf.dispose(output);
+            requestAnimationFrame(detect);
+        };
+    </script>
+</div>
+{% endblock %}
