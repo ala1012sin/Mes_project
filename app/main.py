@@ -17,6 +17,8 @@ from routers import equipment
 from routers import image
 from routers import part
 from routers import tool
+from routers import ai_chat
+from fastapi.middleware.cors import CORSMiddleware
 
 from services.ai_work_time_prediction import get_work_time_sklearn_service, get_work_time_tensorflow_service
 from services.ai_production_qty_prediction import get_production_qty_sklearn_service, get_production_qty_tensorflow_service
@@ -24,6 +26,16 @@ from services.ai_production_qty_prediction import get_production_qty_sklearn_ser
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title = "MES Project")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 개발 환경: 모든 origin 허용
+    # allow_origins=["http://localhost:8000"],  # 프로덕션: 특정 origin만 허용
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메소드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
+
 
 app.mount("/static", StaticFiles(directory="public"), name="static")
 
@@ -54,6 +66,7 @@ app.include_router(equipment.router, prefix="/equipment")
 app.include_router(image.router, prefix="/image")
 app.include_router(part.router, prefix = "/part")
 app.include_router(tool.router, prefix = "/tool")
+app.include_router(ai_chat.router, prefix="/ai_chat")
 
 @app.get("/health")
 def health():
