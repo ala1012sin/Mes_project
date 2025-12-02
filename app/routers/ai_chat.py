@@ -43,6 +43,8 @@ async def process_chatbot(
         response = svc.generate_gpt_chat_response(messages)
     elif model == "gemini":
         response = svc.generate_gemini_chat_response(messages)
+    elif model == "qwen2.5:7b" or model == "gemma3:4b":
+        response = svc.generate_local_llm_chat_response(model, messages)
     else:
         response = "Invalid model selected."
     

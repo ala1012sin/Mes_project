@@ -10,6 +10,8 @@
     <select name="model" id="model">
       <option value="gpt" {% if selected_model == 'gpt' %}selected{% endif %}>GPT</option>
       <option value="gemini" {% if selected_model == 'gemini' %}selected{% endif %}>Gemini</option>
+      <option value="qwen2.5:7b" {% if selected_model == 'qwen2.5:7b' %}selected{% endif %}>Qwen</option>
+      <option value="gemma3:4b" {% if selected_model == 'gemma3:4b' %}selected{% endif %}>Gemma</option>  
     </select>
 
     <input type="text" name="user_input" placeholder="Ask something..." style="width: 300px;" required />

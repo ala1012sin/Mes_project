@@ -14,6 +14,24 @@ load_dotenv()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+def generate_local_llm_chat_response(model: str, messages: list[dict]) -> str:
+    try:
+        url = "http://ollama:11434/api/chat"
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.7,
+            "stream": False
+        }
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        response = response.json()  
+        content = response.get("message", {}).get("content", "")
+        return content
+        
+    except Exception as e:
+        return f"Error occurred: {str(e)}"
+
 def generate_gpt_chat_response(messages: list[dict]) -> str:
     try:
         response = openai_client.chat.completions.create(
