@@ -4,11 +4,35 @@ import os
 from transformers import pipeline
 from dotenv import load_dotenv
 from pathlib import Path
+from openai import OpenAI
+from google import genai
+import requests
+import json
 
 load_dotenv()
 
-HG_token = os.getenv("HG_token")
-os.environ['HF_TOKEN'] = "{HG_token}"
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+def generate_gpt_chat_response(messages: list[dict]) -> str:
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error occurred: {str(e)}"
+
+def generate_gemini_chat_response(messages: list[dict]) -> str:
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=messages[0]['content'],
+        )
+        return response.text
+    except Exception as e:
+        return f"Error occurred: {str(e)}"
 
 
 model_id = "meta-llama/Llama-3.2-1B-Instruct"

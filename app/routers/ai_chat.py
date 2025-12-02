@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Body
+from fastapi import APIRouter, Request, Body, Form
 from fastapi.responses import HTMLResponse
 
 from core.templates import templates
@@ -24,3 +24,31 @@ def generate_response_llama_chat(
     response = svc.generate_response(data)
     
     return {"reply": response}
+
+@router.get("/chatbot", response_class=HTMLResponse)
+async def show_chatbot(request: Request):
+    return templates.TemplateResponse("chatbot.html", {"request": request})
+
+
+
+@router.post("/chatbot", response_class=HTMLResponse)
+async def process_chatbot(
+    request: Request, 
+    user_input: str = Form(...),
+    model: str = Form(...)
+):
+    messages = [{"role": "user", "content": user_input}]
+    
+    if model == "gpt":
+        response = svc.generate_gpt_chat_response(messages)
+    elif model == "gemini":
+        response = svc.generate_gemini_chat_response(messages)
+    else:
+        response = "Invalid model selected."
+    
+    return templates.TemplateResponse("chatbot.html", {
+        "request": request, 
+	    "user_input": user_input, 
+	    "response": response,
+        "selected_model": model
+	})
