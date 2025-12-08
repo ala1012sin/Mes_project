@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}SQL{% endblock %}
+
+{% block content %}
+  <h2>SQL Searching</h2>
+
+  <!-- 질문 입력 영역 -->
+  <form action="/ai_chat/sql/query" method="post">
+    <label for="model">Model:</label>
+		<select name="model" id="model">
+      <option value="gpt" {% if selected_model == 'gpt' %}selected{% endif %}>GPT</option>
+      <option value="gemini" {% if selected_model == 'gemini' %}selected{% endif %}>Gemini</option>
+      <option value="qwen2.5:7b" {% if selected_model == 'qwen2.5:7b' %}selected{% endif %}>Qwen</option>
+      <option value="gemma3:4b" {% if selected_model == 'gemma3:4b' %}selected{% endif %}>Gemma</option>      
+    </select>
+
+    <input type="text" name="user_input" placeholder="Ask something..." style="width: 300px;" required />
+    <button type="submit">Send</button>
+  </form>
+
+   {% if user_input %}
+    <div style="margin-top: 20px;">
+      <strong>You:</strong> {{ user_input }}
+    </div>
+  {% endif %}
+  
+  {% if response %}
+    <div style="margin-top: 10px;">
+      <strong>SQL Result:</strong>
+      <table>
+        <thead>
+          <tr>
+            {% for column in response.columns %}
+              <th>{{ column }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in response.rows %}
+            <tr>
+              {% for item in row %}
+                <td>{{ item }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  
+{% endblock %}

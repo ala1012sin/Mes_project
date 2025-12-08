@@ -18,3 +18,5 @@ accelerate
 torch
 openai
 google-genai
+pgvector          
+pymupdf                

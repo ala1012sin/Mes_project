@@ -27,5 +27,8 @@ from models.equipment_sensor_data import EquipmentSensor
 from models.master_part import MasterPart
 from models.part import Part
 
+# 벡터 임베딩 저장
+from models.vector import Vector
+
 def create_tables():
     Base.metadata.create_all(bind=engine)
